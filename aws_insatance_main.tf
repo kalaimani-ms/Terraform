@@ -1,5 +1,5 @@
 provider "aws" {
-    region="us-east-1"
+    region="eu-west-2"
 }
 
 variable "vpc_cidr_block" {}
@@ -7,11 +7,15 @@ variable "subnet_cidr_block" {}
 variable "env_prefix" {}
 variable "avail_zone"{}
 variable "my_ip" {}
-variable "instance_type" {}
+#variable "instance_type" {}
 variable "key_pair_path_location" {}
+variable "ssh-private" {}
+variable "server-user" {}
+
 
 resource "aws_vpc" "myapp_vpc" {
     cidr_block=var.vpc_cidr_block
+    enable_dns_hostnames= true
     tags = {
         Name="${var.env_prefix}-vpc"
     }
@@ -82,6 +86,12 @@ resource "aws_security_group" "myapp-sg" {
         cidr_blocks=["0.0.0.0/0"]
         protocol="tcp"
     }
+    ingress{
+        from_port="8081"
+        to_port="8081"
+        cidr_blocks=["0.0.0.0/0"]
+        protocol="tcp"
+    }
     egress{
         from_port="0"
         to_port="0"
@@ -99,7 +109,8 @@ data "aws_ami" "myapp-ami" {
     owners=["amazon"]
     filter {
         name="name"
-        values=["amzn2-ami-hvm-*-gp2"]
+        values=["ubuntu/images/hvm-ssd/ubuntu-bionic-18.04-amd64-server-*"] #For Ubuntu
+        # values=["amzn2-ami-*-hvm-*-x86_64-gp2"]
     }
     filter {
         name= "virtualization-type"
@@ -117,9 +128,9 @@ resource "aws_key_pair" "ssh-key"{
     public_key=file(var.key_pair_path_location)
 }
 
-resource "aws_instance" "myapp-server" {
+resource "aws_instance" "myapp-dev-server" {
     ami=data.aws_ami.myapp-ami.id
-    instance_type=var.instance_type
+    instance_type="t2.micro"
 
     subnet_id=aws_subnet.myapp_subnet-1.id
     vpc_security_group_ids=[aws_security_group.myapp-sg.id]
@@ -128,18 +139,63 @@ resource "aws_instance" "myapp-server" {
     associate_public_ip_address= true
     key_name=aws_key_pair.ssh-key.key_name
 
-    user_data = <<EOF
-                    #!/bin/bash
-                    sudo yum update -y && sudo yum install docker -y
-                    sudo usermod -aG docker ec2-user
-                    sudo systemctl start docker
-                    docker run -p 8080:80 nginx
-                EOF
+    
     tags ={
-        Name="${var.env_prefix}-server"
+        Name="dev-server"
     }
+   
 }
 
-output "public_ip" {
-    value=aws_instance.myapp-server.public_ip
+resource "aws_instance" "myapp-dev-server-2" {
+    ami=data.aws_ami.myapp-ami.id
+    instance_type="t2.micro"
+
+    subnet_id=aws_subnet.myapp_subnet-1.id
+    vpc_security_group_ids=[aws_security_group.myapp-sg.id]
+    availability_zone=var.avail_zone
+
+    associate_public_ip_address= true
+    key_name=aws_key_pair.ssh-key.key_name
+
+    
+    tags ={
+        Name="dev-server"
+    }
+   
+}
+
+resource "aws_instance" "myapp-prod-server-1" {
+    ami=data.aws_ami.myapp-ami.id
+    instance_type="t2.small"
+
+    subnet_id=aws_subnet.myapp_subnet-1.id
+    vpc_security_group_ids=[aws_security_group.myapp-sg.id]
+    availability_zone=var.avail_zone
+
+    associate_public_ip_address= true
+    key_name=aws_key_pair.ssh-key.key_name
+
+    
+    tags ={
+        Name="prod-server"
+    }
+   
+}
+
+resource "aws_instance" "myapp-prod-server-2" {
+    ami=data.aws_ami.myapp-ami.id
+    instance_type="t2.small"
+
+    subnet_id=aws_subnet.myapp_subnet-1.id
+    vpc_security_group_ids=[aws_security_group.myapp-sg.id]
+    availability_zone=var.avail_zone
+
+    associate_public_ip_address= true
+    key_name=aws_key_pair.ssh-key.key_name
+
+    
+    tags ={
+        Name="prod-server"
+    }
+   
 }
